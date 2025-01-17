@@ -16,11 +16,18 @@ umi.use(mplTokenMetadata())
 const mint = generateSigner(umi);
 
 (async () => {
-    // let tx = ???
-    // let result = await tx.sendAndConfirm(umi);
-    // const signature = base58.encode(result.signature);
+    // https://arweave.net/2uwXGFEiQDqTbcVc9kFrvfvU3Gt3uQH3nfPKbqBsSst2
+    let tx = await createNft(umi, { 
+        mint , 
+        sellerFeeBasisPoints: percentAmount(50),
+        name: "RuggestRug",
+        symbol: "RRG",
+        uri: "https://devnet.irys.xyz/9j1hd2TGcwbYys1iMdiPzEkRLaf3HDtbGRMyTVNRwKhN"
+    });
+    let result = await tx.sendAndConfirm(umi);
+    const signature = base58.encode(result.signature);
     
-    // console.log(`Succesfully Minted! Check out your TX here:\nhttps://explorer.solana.com/tx/${signature}?cluster=devnet`)
+    console.log(`Succesfully Minted! Check out your TX here:\nhttps://explorer.solana.com/tx/${signature}?cluster=devnet`)
 
     console.log("Mint Address: ", mint.publicKey);
 })();
