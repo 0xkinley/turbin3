@@ -14,7 +14,7 @@ use mpl_core::{
     },
 };
 use crate::{
-    state::{ AdminConfig, FreelancerOverview, WhitelistFreelancer },
+    state::{ AdminConfig, FreelancerOverview, WhitelistFreelancer, Project, ProjectStatus, ProjectDetails },
     error::ErrorCode
 };
 
@@ -27,27 +27,43 @@ pub struct MintPosToken<'info>{
         seeds = [b"admin", admin_config.admin.as_ref()],
         bump = admin_config.admin_bump,
     )]
-    pub admin_config: Account<'info, AdminConfig>,
+    pub admin_config: Box<Account<'info, AdminConfig>>,
+
+    #[account(
+        mut,
+        seeds = [b"project",project.employer.as_ref(),&project.project_number.to_le_bytes()],
+        bump = project.project_bump,
+        constraint = project.project_status == ProjectStatus::Completed @ ErrorCode::ProjectNotCreated
+    )]
+    pub project: Box<Account<'info, Project>>,
+
+    #[account(
+        seeds = [b"project_details", project.key().as_ref()],
+        bump = project_details.details_bump,
+        constraint = project_details.project == project.key() @ ErrorCode::InvalidProject,
+        constraint = project_details.assigned_freelancer == Some(freelancer.key()) @ ErrorCode::UnauthorizedFreelancer
+    )]
+    pub project_details: Box<Account<'info, ProjectDetails>>,
 
     #[account(
         mut,
         seeds = [b"freelancer_overview", freelancer.key().as_ref()],
         bump = freelancer_overview.overview_bump
     )]
-    pub freelancer_overview: Account<'info, FreelancerOverview>,
+    pub freelancer_overview: Box<Account<'info, FreelancerOverview>>,
 
     #[account(
         seeds = [b"freelancer", freelancer.key().as_ref()],
         bump = freelancer_account.freelancer_bump,
         constraint = freelancer_account.freelancer == freelancer.key() @ ErrorCode::InvalidFreelancer
     )]
-    pub freelancer_account: Account<'info, WhitelistFreelancer>,
+    pub freelancer_account: Box<Account<'info, WhitelistFreelancer>>,
 
     #[account(
         mut,
         constraint  = collection.update_authority == admin_config.key(),
     )]
-     pub collection: Account<'info, BaseCollectionV1>,
+     pub collection: Box<Account<'info, BaseCollectionV1>>,
 
     #[account(mut)]
     pub asset: Signer<'info>,

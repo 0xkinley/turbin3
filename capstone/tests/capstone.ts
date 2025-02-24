@@ -12,6 +12,13 @@ import { TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   getMint
  } from "@solana/spl-token";
+import {
+  MPL_CORE_PROGRAM_ID,
+  fetchAsset,
+  fetchCollection,
+  mplCore,
+} from '@metaplex-foundation/mpl-core';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 
 describe("Admin Tests", () => {
   const provider = anchor.AnchorProvider.env();
@@ -2982,5 +2989,472 @@ describe("Task Review and Rating Tests", () => {
     console.log('rating');
     expect(overview.ratingStats.fourStar.toString()).to.equal("1");
     expect(overview.averageRating).to.equal(4.0);
+  });
+});
+
+describe("Proof of Skill NFT Tests", () => {
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+
+  const program = anchor.workspace.Capstone as Program<Capstone>;
+  
+  // Test accounts
+  const admin = Keypair.generate();
+  const freelancer = Keypair.generate();
+  
+  // NFT Keypairs
+  const posCollection = Keypair.generate();
+  const posTokenNFT = Keypair.generate();
+  
+  // PDAs
+  let adminPDA: PublicKey;
+  let freelancerPDA: PublicKey;
+  let freelancerOverviewPDA: PublicKey;
+
+  // Create UMI instance for fetching NFT data
+  const umi = createUmi(provider.connection.rpcEndpoint)
+    .use(mplCore());
+  
+  beforeEach(async () => {
+    // Airdrop SOL for transaction fees
+    const signatures = await Promise.all([
+      provider.connection.requestAirdrop(admin.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL),
+      provider.connection.requestAirdrop(freelancer.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL)
+    ]);
+    
+    await Promise.all(signatures.map(sig => provider.connection.confirmTransaction(sig)));
+
+    // Find PDAs
+    [adminPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("admin"), admin.publicKey.toBuffer()],
+      program.programId
+    );
+
+    [freelancerPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("freelancer"), freelancer.publicKey.toBuffer()],
+      program.programId
+    );
+
+    [freelancerOverviewPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("freelancer_overview"), freelancer.publicKey.toBuffer()],
+      program.programId
+    );
+
+    // Initialize admin
+    try {
+      await program.methods
+        .initializeAdmin()
+        .accounts({
+          admin: admin.publicKey,
+          adminConfig: adminPDA,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([admin])
+        .rpc();
+    } catch (error) {
+      if (!error.toString().includes("already in use")) {
+        throw error;
+      }
+    }
+
+    // Whitelist freelancer
+    try {
+      await program.methods
+        .whitelistFreelancer(
+          freelancer.publicKey,
+          "Test Freelancer",
+          { developer: {} }
+        )
+        .accounts({
+          admin: admin.publicKey,
+          adminConfig: adminPDA,
+          freelancerAccount: freelancerPDA,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([admin])
+        .rpc();
+    } catch (error) {
+      if (!error.toString().includes("already in use")) {
+        throw error;
+      }
+    }
+
+    // Initialize freelancer overview
+    try {
+      await program.methods
+        .initializeFreelancerOverview(freelancer.publicKey)
+        .accounts({
+          admin: admin.publicKey,
+          adminConfig: adminPDA,
+          freelancerAccount: freelancerPDA,
+          freelancerOverview: freelancerOverviewPDA,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([admin])
+        .rpc();
+    } catch (error) {
+      if (!error.toString().includes("already in use")) {
+        throw error;
+      }
+    }
+  });
+
+  it("Admin creates POS token collection", async () => {
+    // Collection parameters
+    const collectionName = "Developer Skills";
+    const collectionUri = "https://arweave.net/Q_njzBo9OP491p8WVqwx-um0Q4Bbk1MO2BsnnQ2ClY8";
+
+    try {
+      // Create the instruction
+      const posCollectionIx = await program.methods
+        .createPosToken(collectionName, collectionUri)
+        .accounts({
+          admin: admin.publicKey,
+          posTokenAccount: posCollection.publicKey,
+          adminConfig: adminPDA,
+          mplCoreProgram: MPL_CORE_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+
+      // Build and send transaction
+      const blockhashContext = await provider.connection.getLatestBlockhash();
+      const tx = new anchor.web3.Transaction({
+        feePayer: admin.publicKey,
+        blockhash: blockhashContext.blockhash,
+        lastValidBlockHeight: blockhashContext.lastValidBlockHeight,
+      }).add(posCollectionIx);
+
+      const signature = await anchor.web3.sendAndConfirmTransaction(
+        provider.connection,
+        tx,
+        [admin, posCollection],
+        {
+          skipPreflight: true,
+          commitment: 'confirmed',
+        }
+      );
+
+      console.log("Collection created with signature:", signature);
+      
+      // Fetch and verify the collection
+      const collectionAsset = await fetchCollection(
+        umi,
+        posCollection.publicKey.toBase58()
+      );
+
+      expect(collectionAsset).to.exist;
+      expect(collectionAsset.name).to.equal(collectionName);
+      expect(collectionAsset.uri).to.equal(collectionUri);
+      
+    } catch (error) {
+      console.error("Error creating POS collection:", error);
+      throw error;
+    }
+  });
+
+  it("Freelancer mints a POS token (NFT badge) after completing a project", async () => {
+    // First create the collection as a prerequisite
+    const collectionName = "Developer Skills";
+    const collectionUri = "https://arweave.net/Q_njzBo9OP491p8WVqwx-um0Q4Bbk1MO2BsnnQ2ClY8";
+
+    await program.methods
+      .createPosToken(collectionName, collectionUri)
+      .accounts({
+        admin: admin.publicKey,
+        posTokenAccount: posCollection.publicKey,
+        adminConfig: adminPDA,
+        mplCoreProgram: MPL_CORE_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([admin, posCollection])
+      .rpc();
+
+    // Setup a completed project as a prerequisite
+    // 1. Create employer account
+    const employer = Keypair.generate();
+    await provider.connection.requestAirdrop(employer.publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
+    
+    const [employerPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("employer"), employer.publicKey.toBuffer()],
+      program.programId
+    );
+    
+    // Whitelist employer
+    await program.methods
+      .whitelistEmployer(
+        employer.publicKey,
+        "Test Employer",
+        "Test Company"
+      )
+      .accounts({
+        admin: admin.publicKey,
+        adminConfig: adminPDA,
+        employerAccount: employerPDA,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([admin])
+      .rpc();
+    
+    // 2. Create token mint for payments
+    const { createMint, createAccount, mintTo } = await import("@solana/spl-token");
+    const tokenMint = await createMint(
+      provider.connection,
+      admin,
+      admin.publicKey,
+      null,
+      6
+    );
+    
+    const employerATA = await createAccount(
+      provider.connection,
+      employer,
+      tokenMint,
+      employer.publicKey
+    );
+    
+    await mintTo(
+      provider.connection,
+      employer,
+      tokenMint,
+      employerATA,
+      admin,
+      1000
+    );
+    
+    // 3. Initialize project
+    const projectId = new anchor.BN(1);
+    const projectBudget = new anchor.BN(1000);
+    
+    const [projectPDA] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("project"),
+        employer.publicKey.toBuffer(),
+        projectId.toArrayLike(Buffer, 'le', 8)
+      ],
+      program.programId
+    );
+    
+    const [projectDetailsPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("project_details"), projectPDA.toBuffer()],
+      program.programId
+    );
+    
+    const [escrowPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from("escrow"), projectPDA.toBuffer()],
+      program.programId
+    );
+    
+    const vaultPDA = await (await import("@solana/spl-token")).getAssociatedTokenAddress(
+      tokenMint,
+      escrowPDA,
+      true
+    );
+    
+    await program.methods
+      .initializeProject(
+        projectId,
+        "Test Project",
+        projectBudget
+      )
+      .accounts({
+        employer: employer.publicKey,
+        tokenMint,
+        tokenAta: employerATA,
+        adminConfig: adminPDA,
+        employerAccount: employerPDA,
+        project: projectPDA,
+        escrow: escrowPDA,
+        vault: vaultPDA,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([employer])
+      .rpc();
+    
+    // 4. Add project details
+    await program.methods
+      .addProjectDetails(
+        "Test Description",
+        { developer: {} },
+        new anchor.BN(Math.floor(Date.now() / 1000) + 86400)
+      )
+      .accounts({
+        employer: employer.publicKey,
+        employerAccount: employerPDA,
+        project: projectPDA,
+        projectDetails: projectDetailsPDA,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([employer])
+      .rpc();
+    
+    // 5. Accept project
+    await program.methods
+      .acceptProject()
+      .accounts({
+        freelancer: freelancer.publicKey,
+        freelancerAccount: freelancerPDA,
+        project: projectPDA,
+        projectDetails: projectDetailsPDA,
+      })
+      .signers([freelancer])
+      .rpc();
+    
+    // 6. Set project as completed (this might require task completion in real scenario)
+    // This is a simplified approach - you might need to adjust based on your actual workflow
+    // Direct update of project status is typically not allowed, but we're simulating completion
+    // In a real scenario, you'd complete all tasks which would mark the project as completed
+    
+    // For simplicity, let's add a task, complete it, and then the project should be completed
+    const taskId = new anchor.BN(1);
+    const [taskPDA] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("task"),
+        projectPDA.toBuffer(),
+        taskId.toArrayLike(Buffer, 'le', 8)
+      ],
+      program.programId
+    );
+    
+    // Add task
+    await program.methods
+      .addTask(
+        taskId,
+        "Test Task",
+        "Test Description",
+        projectBudget // Use the full budget for this task
+      )
+      .accounts({
+        employer: employer.publicKey,
+        employerAccount: employerPDA,
+        project: projectPDA,
+        task: taskPDA,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([employer])
+      .rpc();
+    
+    // Submit task
+    const [submissionPDA] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("submission"),
+        freelancer.publicKey.toBuffer(),
+        taskPDA.toBuffer(),
+        new anchor.BN(0).toArrayLike(Buffer, 'le', 8)
+      ],
+      program.programId
+    );
+    
+    await program.methods
+      .submitTask(
+        "Task submission description",
+        { unitTests: {} },
+        "https://github.com/test/proof"
+      )
+      .accounts({
+        freelancer: freelancer.publicKey,
+        freelancerAccount: freelancerPDA,
+        project: projectPDA,
+        projectDetails: projectDetailsPDA,
+        task: taskPDA,
+        submission: submissionPDA,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([freelancer])
+      .rpc();
+    
+    // Approve task - this should mark the project as completed since it's the only task
+    const freelancerATA = await (await import("@solana/spl-token")).getAssociatedTokenAddress(
+      tokenMint,
+      freelancer.publicKey
+    );
+    
+    await program.methods
+      .approveTask()
+      .accounts({
+        employer: employer.publicKey,
+        freelancer: freelancer.publicKey,
+        tokenMint,
+        employerAccount: employerPDA,
+        project: projectPDA,
+        projectDetails: projectDetailsPDA,
+        task: taskPDA,
+        freelancerOverview: freelancerOverviewPDA,
+        escrow: escrowPDA,
+        vault: vaultPDA,
+        freelancerTokenAccount: freelancerATA,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([employer])
+      .rpc();
+    
+    // Verify project is completed
+    const project = await program.account.project.fetch(projectPDA);
+    expect(project.projectStatus).to.deep.equal({ completed: {} });
+    
+    // Now mint the POS token to the freelancer
+    const tokenName = "JavaScript Developer Badge";
+    const tokenUri = "https://arweave.net/individual-badge-metadata-uri";
+
+    try {
+      // Create the instruction
+      const mintPosTokenIx = await program.methods
+        .mintPosToken(tokenName, tokenUri)
+        .accounts({
+          freelancer: freelancer.publicKey,
+          adminConfig: adminPDA,
+          project: projectPDA,
+          projectDetails: projectDetailsPDA,
+          freelancerOverview: freelancerOverviewPDA,
+          freelancerAccount: freelancerPDA,
+          collection: posCollection.publicKey,
+          asset: posTokenNFT.publicKey,
+          mplCoreProgram: MPL_CORE_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+
+      // Build and send transaction
+      const blockhashContext = await provider.connection.getLatestBlockhash();
+      const tx = new anchor.web3.Transaction({
+        feePayer: freelancer.publicKey,
+        blockhash: blockhashContext.blockhash,
+        lastValidBlockHeight: blockhashContext.lastValidBlockHeight,
+      }).add(mintPosTokenIx);
+
+      const signature = await anchor.web3.sendAndConfirmTransaction(
+        provider.connection,
+        tx,
+        [freelancer, posTokenNFT],
+        {
+          skipPreflight: true,
+          commitment: 'confirmed',
+        }
+      );
+
+      console.log("POS Token minted with signature:", signature);
+      
+      // Fetch and verify the minted token
+      const asset = await fetchAsset(umi, posTokenNFT.publicKey.toBase58());
+      
+      expect(asset).to.exist;
+      expect(asset.name).to.equal(tokenName);
+      expect(asset.uri).to.equal(tokenUri);
+      
+      // Verify the token is part of the collection
+      expect(asset.collection?.key).to.equal(posCollection.publicKey.toBase58());
+      
+      // Verify attributes (would need to decode from the plugins array)
+      // This is a bit more complex and would need custom parsing of the attributes
+      console.log("Asset plugins:", asset.plugins);
+      
+    } catch (error) {
+      console.error("Error minting POS token:", error);
+      throw error;
+    }
   });
 });
