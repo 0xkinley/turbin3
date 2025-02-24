@@ -12,6 +12,9 @@ pub mod accept_project;
 pub mod submit_task;
 pub mod review_task;
 pub mod rate_freelancer;
+pub mod freelancer_overview;
+pub mod create_pos_token;
+pub mod mint_pos_token;
 
 pub use whitelist_freelancer::*;
 pub use initialize_admin::*;
@@ -27,3 +30,6 @@ pub use accept_project::*;
 pub use submit_task::*;
 pub use review_task::*;
 pub use rate_freelancer::*;
+pub use freelancer_overview::*;
+pub use create_pos_token::*;
+pub use mint_pos_token::*;

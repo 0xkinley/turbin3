@@ -88,7 +88,7 @@ pub mod capstone {
 
     pub fn add_task(
         ctx: Context<AddTaskContext>,
-        task_number: u32,
+        task_number: u64,
         title: String,
         description: String,
         budget: u64,
@@ -129,5 +129,28 @@ pub mod capstone {
         feedback: String,
     ) -> Result<()> {
         ctx.accounts.rate_freelancer(rating, feedback, &ctx.bumps)
+    }
+
+    pub fn initialize_freelancer_overview(
+        ctx: Context<InitializeFreelancerOverviewContext>,
+        freelancer: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts.initialize_overview(freelancer, &ctx.bumps)
+    }
+
+    pub fn create_pos_token(
+        ctx: Context<CreatePOSToken>,
+        name: String,
+        uri: String,
+    ) -> Result<()> {
+        ctx.accounts.create_pos_token(name, uri)
+    }
+
+    pub fn mint_pos_token(
+        ctx: Context<MintPosToken>,
+        name: String,
+        uri: String,
+    ) -> Result<()> {
+        ctx.accounts.mint_pos_token(name, uri)
     }
 }

@@ -22,7 +22,7 @@ pub struct AddProjectDetailsContext<'info>{
 
     #[account(
         mut,
-        seeds = [b"project",project.employer.as_ref(),project.project_number.to_le_bytes().as_ref()],
+        seeds = [b"project",project.employer.as_ref(),&project.project_number.to_le_bytes()],
         bump = project.project_bump,
         constraint = project.employer == employer.key() @ ErrorCode::UnauthorizedEmployer,
         constraint = project.project_status == ProjectStatus::Open @ ErrorCode::ProjectNotCreated

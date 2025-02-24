@@ -57,7 +57,7 @@ impl Space for TaskStatus {
 #[derive(InitSpace)]
 pub struct Task {
     pub project: Pubkey,
-    pub task_number: u32,
+    pub task_number: u64,
     #[max_len(100)]
     pub title: String,
     #[max_len(500)]
@@ -68,6 +68,7 @@ pub struct Task {
     pub created_at: i64,
     pub completed_at: Option<i64>,
     pub task_bump: u8,
+    pub submission_counter: u64,
 }
 
 #[derive(AnchorDeserialize, AnchorSerialize, Clone, PartialEq)]

@@ -22,9 +22,8 @@ pub struct AcceptProjectContext<'info> {
 
     #[account(
         mut,
-        seeds = [b"project",project.employer.as_ref(),project.project_number.to_le_bytes().as_ref()],
+        seeds = [b"project",project.employer.as_ref(),&project.project_number.to_le_bytes()],
         bump = project.project_bump,
-        constraint = project.project_status == ProjectStatus::Open @ ErrorCode::ProjectNotCreated
     )]
     pub project: Account<'info, Project>,
 

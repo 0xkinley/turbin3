@@ -22,7 +22,7 @@ pub struct SubmitTaskContext<'info> {
     pub freelancer_account: Account<'info, WhitelistFreelancer>,
 
     #[account(
-        seeds = [b"project",project.employer.as_ref(),project.project_number.to_le_bytes().as_ref()],
+        seeds = [b"project",project.employer.as_ref(),&project.project_number.to_le_bytes()],
         bump = project.project_bump,
     )]
     pub project: Account<'info, Project>,
@@ -37,7 +37,7 @@ pub struct SubmitTaskContext<'info> {
 
     #[account(
         mut,
-        seeds = [b"task",project.key().as_ref(),task.task_number.to_le_bytes().as_ref()],
+        seeds = [b"task",project.key().as_ref(),&task.task_number.to_le_bytes()],
         bump = task.task_bump,
         constraint = task.project == project.key() @ ErrorCode::InvalidTask,
         constraint = task.status == TaskStatus::Open || task.status == TaskStatus::Rejected @ ErrorCode::InvalidTaskStatus
@@ -48,7 +48,7 @@ pub struct SubmitTaskContext<'info> {
         init,
         payer = freelancer,
         space = 8 + TaskSubmission::INIT_SPACE,
-        seeds = [b"submission",freelancer.key().as_ref(), task.key().as_ref()],
+        seeds = [b"submission",freelancer.key().as_ref(), task.key().as_ref(), &task.submission_counter.to_le_bytes()],
         bump
     )]
     pub submission: Account<'info, TaskSubmission>,
@@ -76,6 +76,9 @@ impl<'info> SubmitTaskContext<'info> {
             _ => return Err(ErrorCode::InvalidPocType.into())
         }
 
+        self.task.submission_counter = self.task.submission_counter.checked_add(1)
+            .ok_or(ErrorCode::InvalidUpdate)?;
+
         // Create submission
         self.submission.set_inner(TaskSubmission {
             task: self.task.key(),
@@ -84,7 +87,8 @@ impl<'info> SubmitTaskContext<'info> {
             description,
             proof_of_work,
             submitted_at: Clock::get()?.unix_timestamp,
-            submission_bump: bump.submission
+            submission_bump: bump.submission,
+            submission_counter: self.task.submission_counter,
         });
 
         // Update task status and assign freelancer

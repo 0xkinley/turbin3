@@ -23,7 +23,7 @@ pub struct AddTaskContext<'info> {
 
     #[account(
         mut,
-        seeds = [b"project",project.employer.as_ref(),project.project_number.to_le_bytes().as_ref()],
+        seeds = [b"project",project.employer.as_ref(),&project.project_number.to_le_bytes()],
         bump = project.project_bump,
         constraint = project.employer == employer.key() @ ErrorCode::UnauthorizedEmployer,
         constraint = project.project_status == ProjectStatus::Open @ ErrorCode::ProjectNotCreated
@@ -34,8 +34,7 @@ pub struct AddTaskContext<'info> {
         init,
         payer = employer,
         space = 8 + Task::INIT_SPACE,
-        seeds = [b"task",project.key().as_ref(),task_number.to_le_bytes().as_ref()
-        ],
+        seeds = [b"task",project.key().as_ref(),&task_number.to_le_bytes()],
         bump
     )]
     pub task: Account<'info, Task>,
@@ -46,7 +45,7 @@ pub struct AddTaskContext<'info> {
 impl<'info> AddTaskContext<'info> {
     pub fn add_task(
         &mut self,
-        task_number: u32,
+        task_number: u64,
         title: String,
         description: String,
         budget: u64,
@@ -66,7 +65,8 @@ impl<'info> AddTaskContext<'info> {
             assigned_freelancer: None,
             created_at: Clock::get()?.unix_timestamp,
             completed_at: None,
-            task_bump: bump.task
+            task_bump: bump.task,
+            submission_counter: 0,
         });
 
         self.project.tasks_count += 1;
