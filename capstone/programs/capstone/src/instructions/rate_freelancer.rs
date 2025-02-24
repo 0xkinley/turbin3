@@ -4,6 +4,7 @@ use crate::{
     state::{
         admin::{WhitelistEmployer, WhitelistFreelancer,},
         employer::{Project, ProjectDetails, ProjectStatus, FreelancerRating, Rating},
+        freelancer::FreelancerOverview
     }
 };
 
@@ -49,6 +50,13 @@ pub struct RateFreelancerContext<'info> {
     pub freelancer_account: Account<'info, WhitelistFreelancer>,
 
     #[account(
+        mut,
+        seeds = [b"freelancer_overview", project_details.assigned_freelancer.unwrap().as_ref()],
+        bump = freelancer_overview.overview_bump
+    )]
+    pub freelancer_overview: Account<'info, FreelancerOverview>,
+
+    #[account(
         init,
         payer = employer,
         space = 8 + FreelancerRating::INIT_SPACE,
@@ -74,16 +82,22 @@ impl<'info> RateFreelancerContext<'info> {
             ErrorCode::TasksNotCompleted
         );
 
+        self.freelancer_overview.rating_stats.add_rating(&rating);
+        self.freelancer_overview.average_rating = 
+            self.freelancer_overview.rating_stats.calculate_average();
+       
+
         self.rating.set_inner(FreelancerRating {
             employer: self.employer.key(),
             freelancer: self.project_details.assigned_freelancer.unwrap(),
             project: self.project.key(),
-            rating,
+            rating: rating,
             feedback,
             rated_at: Clock::get()?.unix_timestamp,
             rating_bump: bump.rating
         });
 
         Ok(())
+
     }
 }

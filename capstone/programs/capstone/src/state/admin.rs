@@ -3,6 +3,8 @@ use anchor_lang::{
     Space
 };
 
+use std::fmt;
+
 #[account]
 #[derive(InitSpace)]
 pub struct AdminConfig {
@@ -16,6 +18,16 @@ pub enum Profession{
     Developer,
     Designer,
     ContentWriter
+}
+
+impl fmt::Display for Profession {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Profession::Developer => write!(f, "Developer"),
+            Profession::Designer => write!(f, "Designer"),
+            Profession::ContentWriter => write!(f, "Content Writer"),
+        }
+    }
 }
 
 /// The 1 represents one byte for the enum discriminator (which Rust uses to track which variant is active)

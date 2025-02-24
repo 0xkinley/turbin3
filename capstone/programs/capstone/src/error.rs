@@ -71,5 +71,9 @@ pub enum ErrorCode {
     #[msg("Feedback too long")]
     FeedbackTooLong,
     #[msg("Tasks Not Completed")]
-    TasksNotCompleted
+    TasksNotCompleted,
+    #[msg("Invalid Freelancer Overview")]
+    InvalidFreelancerOverview,
+    #[msg("Invalid Update")]
+    InvalidUpdate,
 }

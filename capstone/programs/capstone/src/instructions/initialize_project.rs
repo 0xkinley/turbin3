@@ -18,20 +18,20 @@ pub struct InitializeProjectContext<'info>{
     #[account(mut)]
     pub employer: Signer<'info>,
 
-    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         mut,
         associated_token::mint = token_mint,
         associated_token::authority = employer,
     )]
-    pub token_ata: InterfaceAccount<'info, TokenAccount>,
+    pub token_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         seeds = [b"admin", admin_config.admin.as_ref()],
         bump = admin_config.admin_bump,
     )]
-    pub admin_config: Account<'info, AdminConfig>,
+    pub admin_config: Box<Account<'info, AdminConfig>>,
 
     #[account(
         seeds = [b"employer", employer.key().as_ref()],
@@ -39,16 +39,16 @@ pub struct InitializeProjectContext<'info>{
         constraint = employer_account.employer == employer.key() && 
                     employer_account.is_whitelisted == true @ ErrorCode::UnauthorizedEmployer
     )]
-    pub employer_account: Account<'info, WhitelistEmployer>,
+    pub employer_account: Box<Account<'info, WhitelistEmployer>>,
 
     #[account(
         init,
         payer = employer,
         space = 8 + Project::INIT_SPACE,
-        seeds = [b"project",employer.key().as_ref(),project_id.to_le_bytes().as_ref()],
+        seeds = [b"project",employer.key().as_ref(),&project_id.to_le_bytes()],
         bump
     )]
-    pub project: Account<'info, Project>,
+    pub project: Box<Account<'info, Project>>,
 
     #[account(
         init,
@@ -57,7 +57,7 @@ pub struct InitializeProjectContext<'info>{
         seeds = [b"escrow", project.key().as_ref()],
         bump
     )]
-    pub escrow: Account<'info, Escrow>,
+    pub escrow: Box<Account<'info, Escrow>>,
 
     #[account(
         init,
@@ -65,7 +65,7 @@ pub struct InitializeProjectContext<'info>{
         associated_token::mint = token_mint,
         associated_token::authority = escrow
     )]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
