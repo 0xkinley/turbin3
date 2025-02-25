@@ -21,9 +21,8 @@ As part of the **Turbin3 Builder's Cohort Q1 2025**, we are diving deep into **S
 | 🤝 **escrow**       | An escrow service enabling secure transactions between parties.             |
 | 🎨 **nft-staking**  | A platform allowing users to stake Non-Fungible Tokens (NFTs) for rewards.  |
 | 🔒 **vault**        | A secure vault for storing and managing sensitive data on-chain.            |
+| 🎓 **capstone**     | A blockchain-based marketplace built on Solana that fosters trust and transparency between freelancers and employers.|
 
-
-(*More programs will be added as the cohort progresses.*)
 
 ## 🛠 Installation & Setup
 
