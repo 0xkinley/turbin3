@@ -119,6 +119,7 @@ impl<'info> InitializeProjectContext<'info> {
         let cpi_ctx =  CpiContext::new(cpi_program, cpi_accounts);
 
         transfer_checked(cpi_ctx, self.project.total_budget, self.token_mint.decimals)?;
+        self.escrow.amount = self.project.total_budget;
         Ok(())
     }
 }
