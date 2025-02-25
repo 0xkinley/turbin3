@@ -179,45 +179,12 @@ The program uses PDA (Program Derived Address) accounts to securely store state:
 - **Escrow/TokenAccount**: Handles secure payments
 - **FreelancerOverview/FreelancerRating**: Tracks reputation
 
-## Installation and Setup
-
-### Prerequisites
+## Prerequisites
 
 - Rust and Cargo
 - Solana CLI
 - Anchor Framework
 - Node.js and npm
-
-### Installation
-
-1. Clone the repository
-   ```bash
-   git clone https://github.com/yourusername/solana-freelancer-marketplace.git
-   cd solana-freelancer-marketplace
-   ```
-
-2. Install dependencies
-   ```bash
-   yarn install
-   ```
-
-3. Build the program
-   ```bash
-   anchor build
-   ```
-
-4. Deploy to a Solana cluster
-   ```bash
-   anchor deploy
-   ```
-
-## Testing
-
-Run the test suite to verify functionality:
-
-```bash
-anchor test
-```
 
 ## Security Considerations
 
@@ -228,11 +195,11 @@ anchor test
 
 ## Future Enhancements
 
-- Dispute resolution mechanism
+- On-ramp and off-ramp facilities
 - Enhanced search and filtering capabilities
 - Bidding system for projects
-- Mobile application
-- Integration with traditional freelance platforms
+- Chatting system
+- Using arweave to upload project files
 
 
 ## Contributors
